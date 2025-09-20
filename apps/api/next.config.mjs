@@ -1,3 +1,3 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = { transpilePackages: ['@cs/core'] };
+const nextConfig = { transpilePackages: ['@ingredientiq/core'] };
 export default nextConfig;
