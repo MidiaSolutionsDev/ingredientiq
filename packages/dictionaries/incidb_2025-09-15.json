@@ -1,0 +1,9 @@
+{
+  "version": "incidb_2025-09-15",
+  "items": [
+    { "inci": "aqua water", "aliases": ["aqua", "water", "aqua (water)"], "status": "green", "why": "Solvent" },
+    { "inci": "glycerin", "aliases": ["glycerine"], "status": "green", "why": "Humectant" },
+    { "inci": "phenoxyethanol", "aliases": [], "status": "yellow", "why": "Preservative" },
+    { "inci": "fragrance", "aliases": ["parfum", "fragrance (parfum)"], "status": "red", "why": "Undisclosed mixture" }
+  ]
+}
