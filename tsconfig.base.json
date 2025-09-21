@@ -12,8 +12,7 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@cs/core": ["packages/core/src/index.ts"],
-      "@cs/schemas": ["packages/schemas/src/index.ts"]
+      "@/*": ["app/*"]
     }
   }
 }

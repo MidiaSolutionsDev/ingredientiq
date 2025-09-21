@@ -1,0 +1,140 @@
+openapi: 3.0.3
+info:
+  title: IngredientIQ API
+  version: 1.0.0
+  description: Analysis and ingredient search for product transparency.
+servers:
+  - url: http://localhost:3000
+paths:
+  /api/v1/analyze:
+    post:
+      summary: Analyze ingredient text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                input:
+                  type: object
+                  properties:
+                    mode: { type: string, enum: [text] }
+                    text: { type: string }
+                  required: [mode, text]
+              required: [input]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  score:
+                    type: object
+                    properties:
+                      value: { type: number }
+                      scale: { type: object, properties: { min: {type: number}, max: {type: number} } }
+                      rule: { type: string }
+                    required: [value, scale, rule]
+                  counts:
+                    type: object
+                    properties:
+                      green: { type: integer }
+                      yellow: { type: integer }
+                      red: { type: integer }
+                      unknown: { type: integer }
+                      total: { type: integer }
+                  buckets:
+                    type: object
+                    properties:
+                      green: { type: array, items: { $ref: '#/components/schemas/Ingredient' } }
+                      yellow: { type: array, items: { $ref: '#/components/schemas/Ingredient' } }
+                      red: { type: array, items: { $ref: '#/components/schemas/Ingredient' } }
+                      unknown: { type: array, items: { $ref: '#/components/schemas/Ingredient' } }
+                  normalized:
+                    type: object
+                    properties:
+                      input_text: { type: string }
+                      tokens: { type: array, items: { type: string } }
+                  dictionary:
+                    type: object
+                    properties:
+                      version: { type: string }
+                  meta:
+                    type: object
+                    properties:
+                      processing_ms: { type: integer }
+                      source: { type: object, properties: { mode: { type: string } } }
+      tags: [Analyze]
+  /api/v1/db/search:
+    get:
+      summary: Autocomplete ingredient names
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+          required: true
+        - in: query
+          name: limit
+          schema: { type: integer, default: 10, maximum: 50 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items: { $ref: '#/components/schemas/Ingredient' }
+                  dictionary:
+                    type: object
+                    properties:
+                      version: { type: string }
+      tags: [Dictionary]
+  /api/v1/configs/me:
+    get:
+      summary: Tenant configuration
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantConfig'
+      tags: [Configs]
+components:
+  schemas:
+    Ingredient:
+      type: object
+      properties:
+        inci: { type: string }
+        aliases: { type: array, items: { type: string } }
+        status: { type: string, enum: [green, yellow, red, unknown] }
+        why: { type: string }
+      required: [inci, status]
+    TenantConfig:
+      type: object
+      properties:
+        tenant:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            branding:
+              type: object
+              properties:
+                primary: { type: string }
+                logo_url: { type: string }
+                badge: { type: string }
+            rubric_default: { type: string }
+            features:
+              type: object
+              properties:
+                ocr: { type: boolean }
+                explanations: { type: boolean }
+                share_links: { type: boolean }

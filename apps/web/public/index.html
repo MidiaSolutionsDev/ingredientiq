@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en" data-tenant="">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>IngredientIQ — Scanner</title>
+  <meta name="description" content="Paste or snap a label — get an instant IngredientIQ score with Safe / Caution / Avoid breakdowns." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:opsz,wght@32..80,700;32..80,800&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --ink:#18181a; --muted:#666; --line:#e6e6e8; --brand:#242426;
+
+      --green-bg:#ecfdf5; --green-bd:#10b981; --green-ink:#065f46;
+      --yellow-bg:#fffbeb; --yellow-bd:#f59e0b; --yellow-ink:#824d00;
+
+      --gold-bg:#FFF7E6; --gold-bd:#D4AF37; --gold-ink:#8B6B00;
+
+      --red-bg:#fef2f2; --red-bd:#ef4444; --red-ink:#7f1d1d;
+      --unk-bg:#f3f4f6; --unk-bd:#9ca3af; --unk-ink:#374151;
+
+      --card:#ffffff; --focus:#2563eb;
+      --brand-serif:"Playfair Display", ui-serif, Georgia, Cambria, "Times New Roman", serif;
+    }
+    /* tenant accent override via data attributes */
+    html[data-accent]{
+      --brand: var(--accent, #242426);
+    }
+    *{box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;max-width:960px;margin:24px auto;padding:0 16px;color:var(--ink)}
+    h1{ margin:0 0 6px; font-family:var(--brand-serif); font-weight:800; letter-spacing:-0.02em; line-height:1.1; font-size:clamp(28px,4vw,42px); }
+    h1 .tenant{ font-weight:900 }
+    .subhead{margin:0 0 14px;color:#2c2c2e;font-size:18px;font-weight:700}
+    .tagline{margin-top:-6px;color:var(--muted);font-size:13px}
+
+    .cred-bar{ margin:12px 0 16px; padding:6px 10px; border:1px solid var(--line); border-radius:10px; background:#fafafa; display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:12px; }
+    .cred-pill{ padding:4px 8px; border:1px solid var(--line); border-radius:999px; background:#fff; font-size:11.5px }
+    .cred-bar .btn{ padding:6px 10px; border-radius:10px; font-size:12px; min-height:auto; min-width:auto }
+    .cred-spacer{ flex:1 }
+
+    textarea{width:100%;min-height:120px;padding:12px;border:1px solid var(--line);border-radius:10px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+    .row.actions{align-items:center}
+    .row.actions .search{order:0;flex:1;min-width:240px;max-width:100%}
+    .row.actions button,.row.actions .btn,.row.actions label{order:1}
+
+    button,.btn{ padding:12px 16px;border-radius:12px;border:1.5px solid var(--brand);background:#fff;font-weight:700;cursor:pointer;text-decoration:none;color:var(--brand);display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px }
+    button.primary,.btn.primary{ background:var(--brand); color:#fff }
+    .chip{ padding:8px 12px; border-radius:999px; border:1px dashed var(--line); background:#fff; font-weight:700; cursor:pointer }
+    button:hover,.btn:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.08) }
+    button:focus-visible,.btn:focus-visible,.chip:focus-visible{ outline:3px solid var(--focus); outline-offset:2px }
+
+    .search input{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px}
+
+    .preview{margin-top:6px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+    .preview img{max-width:280px;border-radius:8px;box-shadow:0 8px 18px rgba(0,0,0,.08)}
+    #progress{font-size:14px;color:#444;min-height:20px}
+    .muted{color:var(--muted);font-size:13px}
+
+    .scorebar{ margin:16px 0 4px; padding:10px 12px; border:1px solid var(--line); background:#fff; border-radius:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-weight:800; }
+    .scorebar .score{ font-size:18px; font-variant-numeric: tabular-nums; }
+    .scorebar .counts{ font-weight:700; color:#333 }
+    .scorebar.elite{ border-color:var(--gold-bd); background:var(--gold-bg); box-shadow:0 6px 14px rgba(212,175,55,.24); animation:score-pop 160ms ease-out; }
+    .scorebar.elite .score{ font-weight:900; }
+    .scorebar.elite #scoreVal{ font-family:var(--brand-serif); letter-spacing:-0.01em; color:var(--gold-ink); }
+    .scorebar.elite #scoreCounts::before{ content:"✓ Champagne Standard! "; color:var(--gold-ink); font-weight:800; }
+
+    @keyframes score-pop{ from{transform:scale(.985);opacity:.96} to{transform:scale(1);opacity:1} }
+
+    .buckets{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px}
+    .bucket{border:1px solid var(--line);border-radius:14px;background:var(--card);display:flex;flex-direction:column;min-height:120px}
+    .bucket__header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:10px 12px;border-top-left-radius:14px;border-top-right-radius:14px}
+    .bucket__title{display:flex;align-items:center;gap:8px;font-weight:800}
+    .badge{font-weight:800;font-size:12px;border-radius:999px;padding:2px 8px}
+    .toggle{border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;min-height:44px;min-width:44px}
+    .bucket__items{ display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px; max-height:280px;overflow-y:auto; }
+    .empty{padding:12px;color:var(--muted);font-size:13px}
+    .guidance{padding:8px 12px;border-top:1px dashed var(--line);font-size:12.5px;color:var(--muted)}
+    .guidance a{color:inherit;text-decoration:underline}
+    .pill{display:inline-flex;align-items:center;gap:6px;margin:0;padding:8px 12px;border-radius:999px;border:1.5px solid #ddd;font-size:13px;line-height:1.2;background:#fff;min-height:36px}
+    .pill.green{background:var(--green-bg);border-color:var(--green-bd);color:var(--green-ink)}
+    .pill.yellow{background:var(--yellow-bg);border-color:var(--yellow-bd);color:var(--yellow-ink)}
+    .pill.red{background:var(--red-bg);border-color:var(--red-bd);color:var(--red-ink)}
+    .pill.unknown{background:var(--unk-bg);border-color:var(--unk-bd);color:var(--unk-ink)}
+    .pill .why{font-weight:600;color:inherit;border-bottom:1px dotted currentColor;cursor:help}
+    .bucket--green .bucket__header{background:rgba(16,185,129,.10);border-color:var(--green-bd)}
+    .bucket--yellow .bucket__header{background:rgba(245,158,11,.10);border-color:var(--yellow-bd)}
+    .bucket--red .bucket__header{background:rgba(239,68,68,.12);border-color:var(--red-bd)}
+    .bucket--unknown .bucket__header{background:#f8fafc;border-color:var(--unk-bd)}
+    .bucket--red{box-shadow:0 10px 20px rgba(239,68,68,.12)}
+    .bucket--yellow{box-shadow:0 8px 16px rgba(245,158,11,.10)}
+    .bucket--green{box-shadow:0 6px 12px rgba(16,185,129,.08)}
+    .ctas{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap}
+
+    @media print{
+      .row:has(#quickFind), .preview, .ctas, .modal, #demoBtn, .chip, .tagline{display:none!important}
+      body{max-width:none}
+      .bucket{break-inside:avoid}
+    }
+  </style>
+</head>
+<body>
+  <h1><span class="tenant">IngredientIQ</span> Scanner</h1>
+  <p class="subhead">Think your products are “clean”? <strong>Prove it.</strong></p>
+  <p class="tagline">Drop an ingredient list and watch our standard put it to the test.</p>
+
+  <div id="credBar" class="cred-bar" role="region" aria-label="Credibility and methodology">
+    <span class="cred-pill">Backed by INCI + peer-reviewed sources</span>
+    <span id="dbUpdated" class="cred-pill" aria-live="polite">Updated —</span>
+    <div class="cred-spacer"></div>
+    <a class="btn" href="https://incibeauty.com/en/ingredients" target="_blank" rel="noopener">INCI reference</a>
+  </div>
+
+  <div class="row">
+    <textarea id="input" placeholder="Paste ingredient list here (comma/semicolon separated)…" aria-label="Ingredient list input"></textarea>
+  </div>
+
+  <div class="row actions" aria-label="Quick find and actions">
+    <div class="search" aria-label="Quick find">
+      <input id="quickFind" type="search" placeholder="Quick find a single ingredient…" aria-label="Quick find ingredient">
+    </div>
+
+    <button id="analyze" class="primary">Analyze</button>
+
+    <label>
+      <input type="file" id="fileInput" accept="image/*" style="display:none">
+      <button id="uploadBtn" type="button">Upload Photo</button>
+    </label>
+
+    <label>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
+      <button id="cameraBtn" type="button">Use Camera</button>
+    </label>
+
+    <button id="demoBtn" class="chip" type="button" aria-label="Insert a demo ingredient list">Try a demo</button>
+  </div>
+
+  <div class="preview">
+    <img id="preview" alt="" />
+    <!-- Removed OCR speed tip per your request; progress text will be blank unless running -->
+    <div id="progress" aria-live="polite"></div>
+  </div>
+
+  <div id="scoreBar" class="scorebar" hidden>
+    <span class="score">Score: <span id="scoreVal">—</span>/100</span>
+    <span class="counts" id="scoreCounts"></span>
+  </div>
+
+  <h3>Results</h3>
+  <div id="results-empty" class="empty" role="status">No ingredients analyzed yet. Paste a list, upload a photo, or use the camera.</div>
+
+  <div id="results" class="buckets" aria-live="polite" hidden>
+    <div class="bucket bucket--red" data-bucket="red">
+      <div class="bucket__header">
+        <div class="bucket__title">❌ Avoid <span class="badge" id="count-red">0</span></div>
+        <button class="toggle" data-toggle="red" aria-expanded="true" aria-controls="list-red">Collapse list</button>
+      </div>
+      <div class="guidance">Typically avoided due to irritation or disclosure gaps.</div>
+      <div id="list-red" class="bucket__items"></div>
+      <div class="empty" id="empty-red" hidden>No avoid items found.</div>
+      <button class="toggle" id="more-red" hidden>Show all</button>
+    </div>
+
+    <div class="bucket bucket--yellow" data-bucket="yellow">
+      <div class="bucket__header">
+        <div class="bucket__title">⚠️ Caution <span class="badge" id="count-yellow">0</span></div>
+        <button class="toggle" data-toggle="yellow" aria-expanded="true" aria-controls="list-yellow">Collapse list</button>
+      </div>
+      <div class="guidance">Context-dependent concerns (pregnancy, acne, sensitivity).</div>
+      <div id="list-yellow" class="bucket__items"></div>
+      <div class="empty" id="empty-yellow" hidden>No caution items found.</div>
+      <button class="toggle" id="more-yellow" hidden>Show all</button>
+    </div>
+
+    <div class="bucket bucket--green" data-bucket="green">
+      <div class="bucket__header">
+        <div class="bucket__title">✅ Safe <span class="badge" id="count-green">0</span></div>
+        <button class="toggle" data-toggle="green" aria-expanded="true" aria-controls="list-green">Collapse list</button>
+      </div>
+      <div class="guidance">Green items are generally well-tolerated.</div>
+      <div id="list-green" class="bucket__items"></div>
+      <div class="empty" id="empty-green" hidden>No safe items found.</div>
+      <button class="toggle" id="more-green" hidden>Show all</button>
+    </div>
+
+    <div class="bucket bucket--unknown" data-bucket="unknown">
+      <div class="bucket__header">
+        <div class="bucket__title">❓ Unknown <span class="badge" id="count-unknown">0</span></div>
+        <button class="toggle" data-toggle="unknown" aria-expanded="true" aria-controls="list-unknown">Collapse list</button>
+      </div>
+      <div class="guidance">Not in our dictionary yet.</div>
+      <div id="list-unknown" class="bucket__items"></div>
+      <div class="empty" id="empty-unknown" hidden>No unknown items — nice!</div>
+      <button class="toggle" id="more-unknown" hidden>Show all</button>
+    </div>
+  </div>
+
+  <div class="ctas">
+    <button id="btnAlternatives" class="btn" hidden>Generate clean alternatives</button>
+    <button id="btnShare" class="btn">Share report (PDF)</button>
+    <button id="btnLink" class="btn">Copy shareable link</button>
+  </div>
+
+  <dialog id="modalMethodology" class="modal" aria-labelledby="modalTitle" aria-modal="true">
+    <div class="modal__card">
+      <div class="modal__header">
+        <h3 id="modalTitle" style="margin:0">Methodology</h3>
+        <button class="close-x" data-close>&times;</button>
+      </div>
+      <div style="font-size:14px;line-height:1.45">
+        <p>We classify on a 4-level scale: Safe, Caution, Avoid, Unknown, using INCI naming, dermatology literature, and expert consensus.</p>
+        <ul>
+          <li><strong>Safe:</strong> Strong consensus of tolerability in typical use.</li>
+          <li><strong>Caution:</strong> Depends on context (acne-prone, pregnancy, sensitivity).</li>
+          <li><strong>Avoid:</strong> Higher irritation risk or insufficient disclosure (“fragrance”).</li>
+          <li><strong>Unknown:</strong> Not enough evidence or not in our dictionary.</li>
+        </ul>
+        <p><em>Disclaimer:</em> Informational only; not medical advice.</p>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn" data-close>Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    // Multi-tenant branding: read subdomain or ?tenant=&accent=
+    (function(){
+      const h = location.hostname.split('.');
+      const sub = (h.length > 2) ? h[0] : '';
+      const p = new URLSearchParams(location.search);
+      const tenant = p.get('tenant') || sub || 'IngredientIQ';
+      const accent = p.get('accent') || '';
+      document.documentElement.dataset.tenant = tenant;
+      if (accent) { document.documentElement.dataset.accent = accent; document.documentElement.style.setProperty('--accent', accent); }
+      document.querySelector('.tenant').textContent = tenant;
+      // Optional: override title
+      document.title = tenant + ' — Scanner';
+      // Expose API base (override with ?api=)
+      window.ING_API_URL = p.get('api') || '/api';
+    })();
+  </script>
+
+  <script src="https://unpkg.com/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+  <script src="./app.js?v=iq1"></script>
+
+  <p class="muted">IngredientIQ © 2025</p>
+</body>
+</html>

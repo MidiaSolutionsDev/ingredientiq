@@ -1,6 +1,7 @@
+// packages/core/src/index.ts
 export type Status = 'green' | 'yellow' | 'red' | 'unknown';
 
-export type DictItem = {
+export type DictEntry = {
   inci: string;
   aliases?: string[];
   status: Status;
@@ -9,119 +10,124 @@ export type DictItem = {
 
 export type Dict = {
   version: string;
-  items: DictItem[];
+  entries: DictEntry[];
 };
 
-export type ScoreParams = {
-  red_weight: number;
-  yellow_weight: number;
-  green_bonus: number;
-  green_bonus_cap: number;
-  min: number;
-  max: number;
+export type AnalyzeResult = {
+  score: number;
+  counts: { green: number; yellow: number; red: number; unknown: number };
+  buckets: { green: DictEntry[]; yellow: DictEntry[]; red: DictEntry[]; unknown: DictEntry[] };
+  normalized: string[];
 };
 
-export const DEFAULT_PARAMS: ScoreParams = {
-  red_weight: 25,
-  yellow_weight: 8,
-  green_bonus: 2,
-  green_bonus_cap: 10,
-  min: 0,
-  max: 100,
-};
+const PLANT_TAILS = [
+  "seed oil","fruit oil","kernel oil","oil",
+  "leaf extract","root extract","flower extract","bark extract","stem extract",
+  "flower/leaf/vine extract","extract","seed oil unsaponifiables","unsaponifiables","sterols"
+];
 
-// --- helpers
-
-export function normalize(s: string): string {
-  // Lowercase, remove extra punctuation around separators, collapse whitespace
-  return s
+export function norm(s: string): string {
+  return String(s || '')
     .toLowerCase()
-    // normalize separators to comma
-    .replace(/[;/|]/g, ',')
-    // remove parentheses but preserve words inside
-    .replace(/[()]/g, ' ')
-    // collapse multiple commas into one
-    .replace(/,+/g, ',')
-    // spaces around commas
-    .replace(/\s*,\s*/g, ',')
-    // non-alphanum (keep commas) -> space
-    .replace(/[^a-z0-9,\s]/g, ' ')
-    // collapse spaces
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s\-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
+function canonicalizePlantPhrase(token: string): string {
+  if (!/^[a-z]+ [a-z]+/.test(token)) return token;
+  let bestTail = '';
+  for (const t of PLANT_TAILS) if (token.endsWith(t) && t.length > bestTail.length) bestTail = t;
+  if (!bestTail) return token;
+  const parts = token.split(/\s+/);
+  const [genus, species] = parts;
+  if (!/^[a-z]+$/.test(genus) || !/^[a-z]+$/.test(species)) return token;
+  return `${genus} ${species} ${bestTail}`;
+}
+
+function canonicalizeTails(token: string): string {
+  let t = token.replace(/\s+/g, ' ').trim();
+  t = t.replace(/\bseed oil unsaponifiables\b/g, "seed oil unsaponifiables");
+  if (/unsaponifiables$/.test(t) && /\bseed oil\b/.test(t)) {
+    t = t.replace(/\bunsaponifiables\b/g, '').replace(/\s+/g, ' ').trim() + " unsaponifiables";
+  }
+  return t;
+}
+
 export function tokenize(text: string): string[] {
-  const norm = normalize(text);
-  // split by commas, then by " + " patterns, trim empties
-  const first = norm.split(',').map(t => t.trim()).filter(Boolean);
-  // Split any that still contain multiple words separated by ' + ' (rare on INCI)
-  const tokens = first.flatMap(tok =>
-    tok.includes(' + ') ? tok.split(' + ').map(t => t.trim()).filter(Boolean) : [tok]
-  );
-  return tokens;
+  const cleaned = String(text || '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/ingredients?:/ig, ' ')
+    .replace(/may contain.*$/ig, ' ')
+    .replace(/[•\u2022\u00B7]/g, ',');
+  return cleaned
+    .split(/[;,]+/g)
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(norm)
+    .map(canonicalizePlantPhrase)
+    .map(canonicalizeTails)
+    .filter(s => s.length > 1);
 }
 
-function toIndex(dict: Dict) {
-  const map = new Map<string, DictItem>();
-  for (const it of dict.items) {
-    map.set(it.inci.toLowerCase(), it);
-    for (const a of it.aliases ?? []) {
-      map.set(a.toLowerCase(), it);
-    }
+export function analyzeText(text: string, dict: Dict): AnalyzeResult {
+  const tokens = tokenize(text);
+  const map = new Map<string, DictEntry>();
+  for (const e of dict.entries || []) {
+    const payload = { inci: e.inci, status: e.status, why: e.why || '', aliases: e.aliases || [] };
+    map.set(norm(e.inci), payload);
+    for (const a of (e.aliases || [])) map.set(norm(a), payload);
   }
-  return map;
-}
+  // for fuzzy contains checks
+  const keys = Array.from(map.keys()).sort((a,b)=>b.length-a.length);
 
-export function classify(tokens: string[], dict: Dict) {
-  const idx = toIndex(dict);
-  const buckets: Record<Status, Array<{ inci: string; status: Status; why?: string }>> = {
-    green: [],
-    yellow: [],
-    red: [],
-    unknown: [],
-  };
+  const seenTokens = new Set<string>();
+  const seenCanonical = new Set<string>();
+  const buckets = { green: [] as DictEntry[], yellow: [] as DictEntry[], red: [] as DictEntry[], unknown: [] as DictEntry[] };
+  const normalized: string[] = [];
+
   for (const raw of tokens) {
-    const t = raw.trim();
-    const hit = idx.get(t);
-    if (!hit) {
-      buckets.unknown.push({ inci: t, status: 'unknown' });
+    if (seenTokens.has(raw)) continue;
+    seenTokens.add(raw);
+    normalized.push(raw);
+
+    let hit = map.get(raw);
+    if (!hit && raw.length >= 4) {
+      const collapsed = canonicalizePlantPhrase(raw);
+      if (collapsed !== raw) hit = map.get(collapsed);
+      if (!hit) {
+        for (const k of keys) {
+          if (k.length < 4) break;
+          if (raw.includes(k) || k.includes(raw)) { hit = map.get(k); if (hit) break; }
+        }
+      }
+    }
+
+    if (hit) {
+      if (!seenCanonical.has(hit.inci)) {
+        seenCanonical.add(hit.inci);
+        buckets[hit.status].push(hit);
+      }
     } else {
-      buckets[hit.status].push({ inci: hit.inci, status: hit.status, why: hit.why });
+      if (!seenCanonical.has(raw)) {
+        seenCanonical.add(raw);
+        buckets.unknown.push({ inci: raw, status: 'unknown', why: '' });
+      }
     }
   }
+
   const counts = {
     green: buckets.green.length,
     yellow: buckets.yellow.length,
     red: buckets.red.length,
-    unknown: buckets.unknown.length,
-    total: tokens.length,
+    unknown: buckets.unknown.length
   };
-  return { buckets, counts };
-}
 
-export function score(
-  counts: { red: number; yellow: number; green: number },
-  p: ScoreParams = DEFAULT_PARAMS
-) {
-  const v =
-    100 -
-    p.red_weight * counts.red -
-    p.yellow_weight * counts.yellow +
-    p.green_bonus * Math.min(counts.green, p.green_bonus_cap);
-  return Math.max(p.min, Math.min(p.max, Math.round(v)));
-}
+  // same heuristic you use client-side
+  const score = Math.max(0, Math.min(100, Math.round(
+    100 - 25 * counts.red - 8 * counts.yellow + 2 * Math.min(counts.green, 10)
+  )));
 
-export function analyzeText(text: string, dict: Dict, params: ScoreParams = DEFAULT_PARAMS) {
-  const input_text = normalize(text);
-  const tokens = tokenize(text);
-  const { buckets, counts } = classify(tokens, dict);
-  const value = score(counts, params);
-  return {
-    score: value,
-    buckets,
-    counts,
-    normalized: { input_text, tokens },
-    dictionary: { version: dict.version },
-  };
+  return { score, counts, buckets, normalized };
 }
