@@ -12,11 +12,14 @@ function withCORS(res: NextResponse) {
   res.headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.headers.set("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization");
   res.headers.set("Access-Control-Max-Age", "86400");
+  res.headers.set("Access-Control-Expose-Headers", "X-IngredientIQ-Dict-Version");
   return res;
 }
-export async function OPTIONS() { return withCORS(new NextResponse(null, { status: 204 })); }
+export async function OPTIONS() {
+  return withCORS(new NextResponse(null, { status: 204 }));
+}
 
-/* ---------------- Dict loader (URL -> file path -> default app/data/ingredient-db.v1.json) ---------------- */
+/* ---------------- Dict loader (URL -> file path -> default data/ingredient-db.v1.json) ---------------- */
 type Row =
   | { inci: string; aliases?: string[]; status: "green" | "yellow" | "red" | "unknown"; why?: string }
   | string;
@@ -32,7 +35,16 @@ let _mem: {
 } = {};
 
 function mtime(p: string): number | null {
-  try { return statSync(p).mtimeMs; } catch { return null; }
+  try {
+    return statSync(p).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+// cwd is apps/api — walk up to repo root /data/ingredient-db.v1.json
+function resolveDefaultPath(): string {
+  return path.join(process.cwd(), "..", "..", "data", "ingredient-db.v1.json");
 }
 
 function adapt(raw: Raw): Dict {
@@ -76,11 +88,6 @@ async function loadFromUrl(url: string): Promise<Dict> {
   return dict;
 }
 
-function resolveDefaultPath(): string {
-  // cwd is apps/api — default to repo-root/app/data/ingredient-db.v1.json
-  return path.join(process.cwd(), "..", "..", "app", "data", "ingredient-db.v1.json");
-}
-
 function loadFromFile(p: string): Dict {
   const mt = mtime(p);
   if (_mem.dict && _mem.filePath === p && _mem.fileMtime === mt) return _mem.dict;
@@ -95,10 +102,13 @@ function loadFromFile(p: string): Dict {
 async function loadDict(): Promise<Dict> {
   // 1) Prefer live URL (e.g., DB-backed dump endpoint)
   if (process.env.DICT_URL) {
-    try { return await loadFromUrl(process.env.DICT_URL); }
-    catch (e) { console.warn("[db/search] DICT_URL failed, falling back to file:", (e as any)?.message || e); }
+    try {
+      return await loadFromUrl(process.env.DICT_URL);
+    } catch (e) {
+      console.warn("[db/search] DICT_URL failed, falling back to file:", (e as any)?.message || e);
+    }
   }
-  // 2) Explicit file override
+  // 2) Explicit file override or default
   const p = process.env.DICT_PATH || resolveDefaultPath();
   return loadFromFile(p);
 }
@@ -110,12 +120,7 @@ export async function GET(req: NextRequest) {
 
     const qRaw = searchParams.get("q");
     if (typeof qRaw !== "string") {
-      return withCORS(
-        NextResponse.json(
-          { results: [], error: { code: "BAD_REQUEST", message: "Missing q" } },
-          { status: 400 }
-        )
-      );
+      return withCORS(NextResponse.json({ results: [], error: { code: "BAD_REQUEST", message: "Missing q" } }, { status: 400 }));
     }
 
     const q = qRaw.toLowerCase().trim();
@@ -128,34 +133,20 @@ export async function GET(req: NextRequest) {
     const needle = q.replace(/\s+/g, " ");
 
     const results = dict.entries
-      .filter(
-        (e) =>
-          e.inci.includes(needle) ||
-          (Array.isArray(e.aliases) && e.aliases.some((a) => a.includes(needle)))
-      )
+      .filter((e) => e.inci.includes(needle) || (Array.isArray(e.aliases) && e.aliases.some((a) => a.includes(needle))))
       .slice(0, limit)
-      .map((e) => ({
-        inci: e.inci,
-        aliases: e.aliases ?? [],
-        status: e.status,
-        why: e.why ?? "",
-      }));
+      .map((e) => ({ inci: e.inci, aliases: e.aliases ?? [], status: e.status, why: e.why ?? "" }));
 
-    return withCORS(NextResponse.json({ results, dictionary: { version: dict.version } }));
+    const res = withCORS(NextResponse.json({ results, dictionary: { version: dict.version } }));
+    res.headers.set("X-IngredientIQ-Dict-Version", dict.version);
+    return res;
   } catch (e: any) {
     const msg = e?.message || "Unknown error";
-    return withCORS(
-      NextResponse.json({ results: [], error: { code: "SERVER", message: msg } }, { status: 500 })
-    );
+    return withCORS(NextResponse.json({ results: [], error: { code: "SERVER", message: msg } }, { status: 500 }));
   }
 }
 
 // Optional: respond to accidental POSTs with method info (keeps CORS consistent)
 export async function POST() {
-  return withCORS(
-    NextResponse.json(
-      { error: { code: "METHOD_NOT_ALLOWED", message: "Use GET to /api/v1/db/search" } },
-      { status: 405 }
-    )
-  );
+  return withCORS(NextResponse.json({ error: { code: "METHOD_NOT_ALLOWED", message: "Use GET to /api/v1/db/search" } }, { status: 405 }));
 }

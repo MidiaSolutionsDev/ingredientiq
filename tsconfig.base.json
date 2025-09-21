@@ -1,18 +1,15 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022", "DOM"],
-    "strict": true,
-    "declaration": true,
-    "sourceMap": true,
     "resolveJsonModule": true,
-    "esModuleInterop": true,
     "skipLibCheck": true,
+    "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["app/*"]
+      "@ingredientiq/core": ["packages/core/src/index.ts"]
     }
   }
 }

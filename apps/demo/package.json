@@ -1,0 +1,16 @@
+{
+  "name": "@ingredientiq/demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --open --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --port 5173",
+    "lint": "echo 'no-lint in demo' && exit 0",
+    "typecheck": "echo 'no TS in demo' && exit 0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  }
+}

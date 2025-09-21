@@ -71,10 +71,9 @@
       display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-weight:800}
     .scorebar .score{font-size:18px;font-variant-numeric:tabular-nums}
     .scorebar .counts{font-weight:700;color:#333}
-    .scorebar.elite{border-color:var(--gold-bd);background:var(--gold-bg);box-shadow:0 6px 14px rgba(212,175,55,.24);animation:score-pop 160ms ease-out}
+    .scorebar.elite{border-color:var(--green-bd);background:var(--green-bg);box-shadow:0 6px 14px rgba(212,175,55,.24);animation:score-pop 160ms ease-out}
     .scorebar.elite .score{font-weight:900}
-    .scorebar.elite #scoreVal{font-family:var(--brand-serif);letter-spacing:-0.01em;color:var(--gold-ink)}
-    .scorebar.elite #scoreCounts::before{content:"✓ Champagne Standard! ";color:var(--gold-ink);font-weight:800}
+    .scorebar.elite #scoreVal{font-family:var(--brand-serif);letter-spacing:-0.01em;color:var(--green-ink)}
     @keyframes score-pop{from{transform:scale(.985);opacity:.96}to{transform:scale(1);opacity:1}}
 
     .buckets{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px}
@@ -153,7 +152,7 @@
   </div>
 
   <div id="scoreBar" class="scorebar" hidden>
-    <span class="score">Champagne Score: <span id="scoreVal">—</span>/100</span>
+    <span class="score">Ingredient IQ Score: <span id="scoreVal">—</span>/100</span>
     <span class="counts" id="scoreCounts"></span>
   </div>
 
@@ -216,7 +215,7 @@
   <dialog id="modalMethodology" class="modal" aria-labelledby="modalTitle" aria-modal="true">
     <div class="modal__card">
       <div class="modal__header">
-        <h3 id="modalTitle" style="margin:0">Methodology — Champagne Standard™</h3>
+        <h3 id="modalTitle" style="margin:0">Methodology — IngredientIQ Standard™</h3>
         <button class="close-x" data-close>&times;</button>
       </div>
       <div style="font-size:14px;line-height:1.45">
