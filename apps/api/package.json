@@ -2,5 +2,5 @@
   "name": "ingredientiq-api",
   "private": true,
   "version": "0.1.0",
-  "engines": { "node": "18.x" }
+  "engines": { "node": "22.x" }
 }
